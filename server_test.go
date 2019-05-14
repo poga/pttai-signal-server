@@ -4,9 +4,8 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
-
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/ed25519"
 )
 
 func TestServerIdentifyNodeID(t *testing.T) {
@@ -14,7 +13,7 @@ func TestServerIdentifyNodeID(t *testing.T) {
 
 	challenge := server.generateChallenge()
 
-	key, err := crypto.GenerateKey()
+	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		t.Errorf("failed: %v", err)
 	}
@@ -22,12 +21,9 @@ func TestServerIdentifyNodeID(t *testing.T) {
 	hash := crypto.Keccak256Hash(challenge)
 
 	// sign challenge with key
-	sig, err := crypto.Sign(hash[:], key)
-	if err != nil {
-		t.Errorf("failed: %v", err)
-	}
+	sig := ed25519.Sign(privateKey, hash[:])
 
-	nodeID := discv5.PubkeyID(&key.PublicKey)
+	nodeID := NodeID(publicKey)
 	resp := &challengeResponse{
 		NodeID:    nodeID,
 		Hash:      hash,
@@ -43,16 +39,16 @@ func TestServerIdentifyNodeID(t *testing.T) {
 func TestServerRemoveFromNodeChannels(t *testing.T) {
 	server := NewServer()
 
-	nodeID := discv5.NodeID{}
+	nodeID := NodeID{}
 
 	nodeConn, err := server.newNodeConn(nodeID, nil)
 	assert.NoError(t, err)
 
-	_, exists := server.nodeChannels.Load(nodeID)
+	_, exists := server.nodeChannels.Load(string(nodeID))
 	assert.Equal(t, true, exists)
 
 	server.removeFromNodeChannels(nodeConn)
 
-	_, exists = server.nodeChannels.Load(nodeID)
+	_, exists = server.nodeChannels.Load(string(nodeID))
 	assert.Equal(t, false, exists)
 }

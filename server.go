@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/ed25519"
 )
 
 type challenge struct {
@@ -17,14 +17,14 @@ type challenge struct {
 }
 
 type challengeResponse struct {
-	NodeID discv5.NodeID
+	NodeID NodeID
 
 	Signature []byte
 	Hash      [32]byte
 }
 
 type challengeAck struct {
-	NodeID discv5.NodeID
+	NodeID NodeID
 }
 
 type Server struct {
@@ -72,7 +72,7 @@ func (s *Server) readLoop(nc *NodeConn) error {
 }
 
 func (s *Server) dispatch(signal *Signal) error {
-	if nc, ok := s.nodeChannels.Load(signal.ToID); ok {
+	if nc, ok := s.nodeChannels.Load(string(signal.ToID)); ok {
 		(nc.(*NodeConn)).writeChan <- signal
 	}
 	return nil
@@ -97,13 +97,10 @@ func (s *Server) verifyNode(challenge []byte, resp *challengeResponse) error {
 		return fmt.Errorf("hash incorrect from node %s", resp.NodeID)
 	}
 
-	publicKey, err := resp.NodeID.Pubkey()
-	if err != nil {
-		return err
-	}
+	publicKey := ed25519.PublicKey(resp.NodeID)
 
 	// check signature match nodeID(public key)
-	verified := crypto.VerifySignature(crypto.FromECDSAPub(publicKey), resp.Hash[:], resp.Signature[:64])
+	verified := ed25519.Verify(publicKey, []byte(resp.Hash[:]), resp.Signature)
 	if !verified {
 		return fmt.Errorf("unable to verify signature from node %s", resp.NodeID)
 	}
@@ -111,7 +108,7 @@ func (s *Server) verifyNode(challenge []byte, resp *challengeResponse) error {
 	return nil
 }
 
-func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
+func (s *Server) identifyNodeID(conn *Conn) (NodeID, error) {
 	c := s.generateChallenge()
 
 	tmpC := &challenge{Challenge: c}
@@ -120,34 +117,34 @@ func (s *Server) identifyNodeID(conn *Conn) (discv5.NodeID, error) {
 	err := conn.WsConn.WriteJSON(tmpC)
 	// log.Printf("server.identifyNodeID: after WriteJSON signal: %v, e: %v", signal, err)
 	if err != nil {
-		return discv5.NodeID{}, err
+		return NodeID{}, err
 	}
 
 	resp := &challengeResponse{}
 	err = conn.WsConn.ReadJSON(resp)
 	if err != nil {
-		return discv5.NodeID{}, err
+		return NodeID{}, err
 	}
 
 	err = s.verifyNode(c, resp)
 	if err != nil {
-		return discv5.NodeID{}, err
+		return NodeID{}, err
 	}
 
 	return resp.NodeID, nil
 }
 
-func (s *Server) newNodeConn(nodeID discv5.NodeID, wsConn *Conn) (*NodeConn, error) {
+func (s *Server) newNodeConn(nodeID NodeID, wsConn *Conn) (*NodeConn, error) {
 	// check already exists
 	s.nodeChannelsWriteLock.Lock()
 	defer s.nodeChannelsWriteLock.Unlock()
 
-	if origConn, exists := s.nodeChannels.Load(nodeID); exists {
+	if origConn, exists := s.nodeChannels.Load(string(nodeID)); exists {
 		(origConn.(*NodeConn)).Conn.Close()
 	}
 
 	nc := NewNodeConn(nodeID, wsConn)
-	s.nodeChannels.Store(nodeID, nc)
+	s.nodeChannels.Store(string(nodeID), nc)
 
 	return nc, nil
 }
@@ -196,7 +193,7 @@ func (s *Server) removeFromNodeChannels(nodeConn *NodeConn) {
 	s.nodeChannelsWriteLock.Lock()
 	defer s.nodeChannelsWriteLock.Unlock()
 
-	if origConn, exists := s.nodeChannels.Load(nodeConn.NodeID); exists && origConn.(*NodeConn) == nodeConn {
-		s.nodeChannels.Delete(nodeConn.NodeID)
+	if origConn, exists := s.nodeChannels.Load(string(nodeConn.NodeID)); exists && origConn.(*NodeConn) == nodeConn {
+		s.nodeChannels.Delete(string(nodeConn.NodeID))
 	}
 }

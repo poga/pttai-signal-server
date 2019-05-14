@@ -5,10 +5,9 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/ed25519"
 )
 
 func TestNewClient(t *testing.T) {
@@ -24,15 +23,15 @@ func TestNewClient(t *testing.T) {
 		srv.ListenAndServe()
 	}()
 
-	key, err := crypto.GenerateKey()
+	publicKey, privateKey, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		t.Errorf("failed: %v", err)
 	}
-	nodeID := discv5.PubkeyID(&key.PublicKey)
+	nodeID := NodeID(publicKey)
 
 	url := url.URL{Scheme: "ws", Host: addr, Path: "/signal"}
 
-	_, err = NewClient(nodeID, key, url)
+	_, err = NewClient(nodeID, &privateKey, url)
 	assert.NoError(t, err)
 
 }
@@ -53,23 +52,23 @@ func TestClientSendReceive(t *testing.T) {
 
 	url := url.URL{Scheme: "ws", Host: addr, Path: "/signal"}
 
-	key1, err := crypto.GenerateKey()
+	publicKey1, privateKey1, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		t.Errorf("failed generate key1: %v", err)
 	}
-	nodeID1 := discv5.PubkeyID(&key1.PublicKey)
+	nodeID1 := NodeID(publicKey1)
 
-	key2, err := crypto.GenerateKey()
+	publicKey2, privateKey2, err := ed25519.GenerateKey(nil)
 	if err != nil {
 		t.Errorf("failed generate key2: %v", err)
 	}
-	nodeID2 := discv5.PubkeyID(&key2.PublicKey)
+	nodeID2 := NodeID(publicKey2)
 
-	c1, err := NewClient(nodeID1, key1, url)
+	c1, err := NewClient(nodeID1, &privateKey1, url)
 	t.Logf("TestClientSendReceive: after c1: e: %v", err)
 	assert.NoError(t, err)
 
-	c2, err := NewClient(nodeID2, key2, url)
+	c2, err := NewClient(nodeID2, &privateKey2, url)
 	t.Logf("TestClientSendReceive: after c2: e: %v", err)
 	assert.NoError(t, err)
 

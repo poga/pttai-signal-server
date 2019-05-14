@@ -3,7 +3,6 @@ package signalserver
 import (
 	"sync/atomic"
 
-	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/gorilla/websocket"
 )
 
@@ -22,7 +21,7 @@ func (conn *Conn) Close() {
 }
 
 type NodeConn struct {
-	NodeID discv5.NodeID
+	NodeID NodeID
 
 	Conn *Conn
 
@@ -30,7 +29,7 @@ type NodeConn struct {
 	quitChan  chan struct{}
 }
 
-func NewNodeConn(nodeID discv5.NodeID, conn *Conn) *NodeConn {
+func NewNodeConn(nodeID NodeID, conn *Conn) *NodeConn {
 	w := make(chan *Signal)
 	q := make(chan struct{})
 
