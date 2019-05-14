@@ -38,7 +38,7 @@ func (c *Client) Receive() (*Signal, error) {
 		return nil, err
 	}
 
-	if !sameNodeID(c.nodeID, signal.ToID) {
+	if !c.nodeID.Equal(signal.ToID) {
 		return nil, ErrInvalidNodeID
 	}
 
@@ -76,7 +76,7 @@ func NewClient(nodeID NodeID, privKey *ed25519.PrivateKey, url url.URL) (*Client
 		return nil, errors.Wrap(err, "unable to read ack")
 	}
 
-	if !sameNodeID(cack.NodeID, nodeID) {
+	if !cack.NodeID.Equal(nodeID) {
 		return nil, ErrInvalidNodeID
 	}
 
@@ -97,8 +97,4 @@ func respondChallenge(nodeID NodeID, privKey *ed25519.PrivateKey, c *challenge) 
 
 func (c *Client) Close() {
 	c.Conn.Close()
-}
-
-func sameNodeID(a NodeID, b NodeID) bool {
-	return string(a) == string(b)
 }
