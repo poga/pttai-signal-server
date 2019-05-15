@@ -1,4 +1,4 @@
-module github.com/ailabstw/pttai-signal-server
+module github.com/poga/pttai-signal-server
 
 go 1.12
 
